@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>İnşaat Takip Pro v16</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; background: #0f172a; color: #f1f5f9; overflow: hidden; }
+        @media (min-width: 768px) { body { flex-direction: row; } }
+
+        #loginScreen { position: fixed; inset: 0; background: #0f172a; display: flex; align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 12px; }
+        #loginScreen.hidden { display: none; }
+        .login-box { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 32px 28px; width: 100%; max-width: 340px; }
+        .login-box h1 { color: #38bdf8; font-size: 1.1em; margin: 0 0 6px; text-align: center; }
+        .login-box p  { color: #64748b; font-size: 0.75em; text-align: center; margin: 0 0 20px; }
+        .login-box label { font-size: 0.72em; color: #94a3b8; display: block; margin-bottom: 4px; margin-top: 10px; }
+        .login-box input { width: 100%; padding: 9px 10px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: white; font-size: 0.9em; }
+        .login-box input:focus { outline: none; border-color: #38bdf8; }
+        #loginError { color: #ef4444; font-size: 0.75em; text-align: center; min-height: 18px; margin-top: 8px; }
+
+        #userBadge { display: flex; align-items: center; gap: 8px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 6px 10px; margin-bottom: 6px; }
+        #userBadge .avatar { width: 26px; height: 26px; border-radius: 50%; background: #38bdf8; color: #0f172a; font-weight: bold; font-size: 0.8em; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        #userBadge .uname  { flex: 1; font-size: 0.8em; font-weight: bold; }
+        #userBadge .urole  { font-size: 0.65em; color: #64748b; }
+        #logoutBtn { font-size: 0.7em; color: #ef4444; cursor: pointer; padding: 2px 6px; border: 1px solid #ef444440; border-radius: 4px; }
+        #logoutBtn:hover { background: #ef444420; }
+
+        #sidebar { width: 100%; max-height: 45%; background: #1e293b; padding: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); z-index: 100; overflow-y: auto; border-bottom: 2px solid #334155; }
+        @media (min-width: 768px) { #sidebar { width: 330px; max-height: 100%; border-bottom: none; border-right: 2px solid #334155; } }
+
+        #viewport { flex-grow: 1; position: relative; touch-action: none; }
+        
+        h2 { color: #38bdf8; font-size: 0.9em; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 1px; }
+        .section-title { font-size: 0.65em; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin: 12px 0 6px; border-top: 1px solid #334155; padding-top: 10px; }
+        .group { margin-bottom: 10px; }
+        label { display: block; font-size: 0.72em; color: #94a3b8; margin-bottom: 4px; }
+        select, input[type="text"], input[type="number"], input[type="password"] { width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: white; font-size: 0.85em; }
+        input[type="text"]:focus, input[type="number"]:focus, input[type="password"]:focus, select:focus { outline: none; border-color: #38bdf8; }
+        textarea { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: white; font-family: inherit; font-size: 0.85em; resize: vertical; min-height: 60px; }
+        textarea:focus { outline: none; border-color: #38bdf8; }
+        
+        .btn { width: 100%; padding: 9px; border-radius: 6px; border: none; color: white; cursor: pointer; font-size: 0.85em; font-weight: bold; transition: opacity 0.2s; }
+        .btn:hover { opacity: 0.85; }
+        .btn:active { opacity: 0.7; }
+        .btn-blue { background: #3b82f6; }
+        .btn-green { background: #10b981; }
+        .btn-red { background: #ef4444; }
+        .btn-yellow { background: #eab308; color: #0f172a; }
+        .btn-gray { background: #475569; }
+        .btn-row { display: flex; gap: 6px; margin-top: 5px; }
+        .btn-row .btn { flex: 1; }
+
+        ul.generic-list { list-style: none; margin: 0; padding: 0; max-height: 120px; overflow-y: auto; }
+        ul.generic-list li { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px; background: #0f172a; border-radius: 5px; margin-bottom: 4px; font-size: 0.8em; cursor: pointer; border: 1px solid #334155; transition: border-color 0.2s; }
+        ul.generic-list li.selected { border-color: #38bdf8; background: #0d2035; }
+        ul.generic-list li .action-btns { display: flex; gap: 8px; align-items: center; }
+        .remove-btn { color: #ef4444; cursor: pointer; font-size: 1.1em; }
+        .edit-btn { color: #38bdf8; cursor: pointer; font-size: 1em; }
+
+        .add-form { background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 8px; margin-top: 8px; }
+        .add-form .row { display: flex; gap: 6px; }
+        .add-form .row input { flex: 1; }
+        
+        #modeIndicator { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(14,165,233,0.2); border: 1px solid #38bdf8; color: #38bdf8; padding: 6px 14px; border-radius: 20px; font-size: 0.75em; pointer-events: none; display: none; }
+        
+        
+        .color-row { display: flex; gap: 5px; margin-bottom: 6px; flex-wrap: wrap; }
+        .color-swatch { width: 22px; height: 22px; border-radius: 4px; cursor: pointer; border: 2px solid transparent; transition: border-color 0.2s; }
+        .color-swatch.selected { border-color: white; }
+        .hint { font-size: 0.65em; color: #475569; margin-top: 8px; line-height: 1.5; }
+        .status-ok   { color: #10b981 !important; }
+        .status-err  { color: #ef4444 !important; }
+        .status-load { color: #eab308 !important; }
+        
+        #saveBtn { display: none; } 
+
+        .locked { opacity: 0.35; pointer-events: none; position: relative; }
+        .locked::after { content: '🔒'; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 1.2em; }
+
+        /* MODALLAR */
+        #userModal, #editModal, #logModal { position: fixed; inset: 0; background: rgba(15,23,42,0.85); display: flex; align-items: center; justify-content: center; z-index: 10000; }
+        .hidden { display: none !important; }
+        .modal-content { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; width: 90%; max-width: 450px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        
+        .log-item { background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 10px; margin-bottom: 8px; font-size: 0.75em; }
+        .log-header { display: flex; justify-content: space-between; color: #94a3b8; margin-bottom: 4px; font-size: 0.9em; }
+        .log-body { color: #f1f5f9; }
+        .log-user { color: #38bdf8; font-weight: bold; }
+
+        .progress-container { width: 100%; background: #0f172a; border-radius: 6px; height: 18px; border: 1px solid #334155; position: relative; overflow: hidden; margin-bottom: 8px; }
+        .progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #38bdf8, #10b981); transition: width 0.4s ease; }
+        .progress-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 0.7em; font-weight: bold; color: #fff; text-shadow: 0 0 2px #000; }
+
+        .chip-group { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        .chip { padding: 5px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 16px; font-size: 0.75em; cursor: pointer; color: #94a3b8; user-select: none; transition: 0.2s; }
+        .chip:hover { border-color: #64748b; }
+        .chip.selected { background: #0ea5e920; border-color: #38bdf8; color: #38bdf8; font-weight: bold; }
+        .chip.all-star { border-color: #10b98150; color: #10b981; }
+        .chip.all-star.selected { background: #10b98120; border-color: #10b981; }
+    </style>
+</head>
+<body>
+
+<div id="loginScreen">
+    <div class="login-box">
+        <h1>🏗️ İNŞAAT TAKİP</h1>
+        <p>Devam etmek için giriş yapın</p>
+        <label>Apps Script URL</label>
+        <input type="text" id="loginUrl" placeholder="https://script.google.com/macros/s/..." style="font-size:0.72em;">
+        <label style="margin-top:10px;">Kullanıcı Adı</label>
+        <input type="text" id="loginUser" placeholder="kullanici_adi" autocomplete="username">
+        <label>Şifre</label>
+        <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password">
+        <div id="loginError"></div>
+        <button class="btn btn-blue" style="margin-top:14px;" onclick="doLogin()">Giriş Yap</button>
+        <div id="loginUrlNote">URL bir kez girildiğinde hatırlanır.</div>
+    </div>
+</div>
+
+<div id="sidebar">
+    <h2>🏗️ SAHA TAKİP v16</h2>
+
+    <div id="userBadge" style="display:none;">
+        <div class="avatar" id="userAvatar">?</div>
+        <div style="flex:1;">
+            <div class="uname" id="userNameLabel">—</div>
+            <div class="urole" id="userRoleLabel">—</div>
+        </div>
+        <span id="logoutBtn" onclick="doLogout()">Çıkış</span>
+    </div>
+
+    <div class="section-title">📈 Proje İlerlemesi & Rapor</div>
+    <div class="progress-container" title="Tüm bloklar ve imalatların genel tamamlanma oranı">
+        <div id="progressBar" class="progress-bar"></div>
+        <div id="progressText" class="progress-text">%0 Tamamlandı</div>
+    </div>
+    
+    <div class="btn-row" id="adminReportsBtn" style="display:none;">
+        <button class="btn btn-gray" onclick="openLogModal()">📋 İşlem Geçmişi</button>
+        <button class="btn btn-green" onclick="exportToExcel()">📥 Excel İndir</button>
+    </div>
+
+    <button class="btn btn-blue" id="manageUsersBtn" onclick="openUserManager()" style="display:none; margin-top:8px; font-size: 0.75em; width: 100%;">
+        👥 Mühendis & Görev Yönetimi
+    </button>
+
+    <button class="btn" id="lockBtn" onclick="toggleEditLock()" style="margin-top:8px; margin-bottom:2px; background:#475569; display:none; width:100%;">
+        🔒 Düzenleme Kapalı — Aç
+    </button>
+
+    <div class="section-title">☁️ Google Sheets Bağlantısı</div>
+    <div class="add-form" id="sheetsSetup">
+        <label>Apps Script Web App URL</label>
+        <input type="text" id="scriptUrl" placeholder="https://script.google.com/macros/s/..." style="margin-bottom:6px; font-size:0.75em;">
+        <div class="btn-row">
+            <button class="btn btn-blue" onclick="connectSheets()">Bağlan & Yükle</button>
+            <button class="btn btn-gray" onclick="saveToSheets()" id="saveBtn" disabled>💾 Tümünü Kaydet</button>
+        </div>
+        <div id="syncStatus" style="font-size:0.68em; margin-top:6px; color:#64748b;">Bağlı değil</div>
+    </div>
+
+    <div class="section-title" id="planSectionTitle">📐 Kat Planları (Şablonlar)</div>
+    <ul id="planList" class="generic-list"></ul>
+    <div class="add-form" id="addPlanSection">
+        <label>Yeni Kat Planı Şablonu</label>
+        <input type="text" id="newPlanName" placeholder="Örn: 2B+Z+3" maxlength="20" style="margin-bottom:6px;">
+        <textarea id="newPlanFloors" placeholder="Aşağıdan yukarı, virgülle: Bodrum 2, Bodrum 1, Zemin, 1. Kat..."></textarea>
+        <button class="btn btn-blue" style="margin-top:6px;" onclick="addPlan()">+ Plan Şablonu Ekle</button>
+    </div>
+
+    <div class="section-title" id="blockSectionTitle">📦 Blok Yönetimi</div>
+    <ul id="blockList" class="generic-list"></ul>
+    <div class="add-form" id="addBlockSection">
+        <label>Blok Ekle</label>
+        <div class="row" style="flex-direction:column;">
+            <input type="text" id="newBlockName" placeholder="Blok Adı (Örn: A BLOK)" maxlength="12">
+            <select id="newBlockPlanSel" style="margin-top:2px;">
+                </select>
+        </div>
+        <button class="btn btn-blue" style="margin-top:6px;" onclick="addBlock()">+ Blok Ekle</button>
+    </div>
+
+    <div class="section-title">⚙️ Seçili Blok İşlemleri</div>
+    <div id="blockOpSection">
+        <div class="group">
+            <label>İmalat Türü</label>
+            <select id="typeSel" onchange="refreshSceneColors()"></select>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-green" onclick="updateCurrentBlock(2)">Tümünü Bitir</button>
+            <button class="btn btn-red" onclick="updateCurrentBlock(0)">Sıfırla</button>
+        </div>
+        
+        <div id="rotateSection" style="display:none; margin-top:10px; border-top: 1px solid #334155; padding-top: 10px;">
+            <label>Blok Yönü (Kendi Ekseninde)</label>
+            <div class="btn-row">
+                <button class="btn btn-gray" onclick="rotateCurrentBlock(15)">↺ Sola Çevir</button>
+                <button class="btn btn-gray" onclick="rotateCurrentBlock(-15)">Sağa Çevir ↻</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="dragSection">
+        <div class="section-title">🖱️ Blok Konumu</div>
+        <div class="btn-row">
+            <button class="btn btn-yellow" id="dragModeBtn" onclick="toggleDragMode()">Taşıma Modu: KAPALI</button>
+        </div>
+        <div class="hint">Bloklar zemindeki ızgaraya oturacaktır.</div>
+    </div>
+
+    <div class="section-title" id="typeSectionTitle">🔧 İmalat Türleri</div>
+    <ul id="typeList" class="generic-list"></ul>
+    <div class="add-form" id="addTypeSection">
+        <label>Yeni İmalat Türü</label>
+        <input type="text" id="newTypeName" placeholder="Tür adı" maxlength="20" style="margin-bottom:6px;">
+        <label>Renk</label>
+        <div class="color-row" id="colorSwatches"></div>
+        <button class="btn btn-blue" onclick="addType()">+ Tür Ekle</button>
+    </div>
+</div>
+
+<div id="viewport">
+    <div id="modeIndicator">✋ Taşıma Modu Aktif</div>
+
+    <!-- BLOK POPUP KARTI -->
+    <div id="blockPopup" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+        background:rgba(15,23,42,0.97); border:1px solid #38bdf8; border-radius:16px;
+        padding:20px 24px; min-width:280px; max-width:340px; z-index:500;
+        box-shadow:0 8px 40px rgba(56,189,248,0.18); pointer-events:all;
+        animation: popupIn 0.18s ease;">
+        <style>
+            @keyframes popupIn { from { opacity:0; transform:translate(-50%,-50%) scale(0.92); } to { opacity:1; transform:translate(-50%,-50%) scale(1); } }
+        </style>
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px;">
+            <div>
+                <div id="popupBlockName" style="font-size:1.2em; font-weight:bold; color:#38bdf8; letter-spacing:1px;"></div>
+                <div id="popupBlockMeta" style="font-size:0.72em; color:#64748b; margin-top:2px;"></div>
+            </div>
+            <span onclick="closeBlockPopup()" style="cursor:pointer; color:#475569; font-size:1.3em; line-height:1; padding:2px 6px; border-radius:4px; transition:color 0.15s;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#475569'">✕</span>
+        </div>
+
+        <!-- Genel tamamlanma -->
+        <div style="margin-bottom:16px;">
+            <div style="display:flex; justify-content:space-between; font-size:0.72em; color:#94a3b8; margin-bottom:5px;">
+                <span>Genel Tamamlanma</span>
+                <span id="popupTotalPct" style="color:#10b981; font-weight:bold;"></span>
+            </div>
+            <div style="background:#1e293b; border-radius:6px; height:10px; overflow:hidden;">
+                <div id="popupTotalBar" style="height:100%; border-radius:6px; background:linear-gradient(90deg,#38bdf8,#10b981); transition:width 0.4s ease; width:0%;"></div>
+            </div>
+        </div>
+
+        <!-- İmalat bazında barlar -->
+        <div id="popupTypeRows" style="display:flex; flex-direction:column; gap:10px;"></div>
+
+        <!-- Seçili kat bilgisi -->
+        <div id="popupFloorInfo" style="display:none; margin-top:14px; padding-top:12px; border-top:1px solid #1e293b;">
+            <div style="font-size:0.68em; color:#64748b; margin-bottom:4px;">SEÇİLİ KAT</div>
+            <div id="popupFloorDetail" style="font-size:0.82em; color:#f1f5f9;"></div>
+        </div>
+    </div>
+
+    <!-- Küçük kat bilgi notu (sağ üst, sade) -->
+    <div id="floorHint" style="display:none; position:absolute; bottom:16px; left:50%; transform:translateX(-50%);
+        background:rgba(30,41,59,0.88); border:1px solid #334155; border-radius:8px;
+        padding:6px 14px; font-size:0.73em; color:#94a3b8; pointer-events:none;">
+        <span id="floorHintText"></span>
+    </div>
+</div>
+
+<div id="logModal" class="hidden">
+    <div class="modal-content">
+        <h2 style="display:flex; justify-content:space-between; margin-top:0;">
+            📋 İşlem Geçmişi (Son 100)
+            <span style="cursor:pointer; color:#ef4444; font-size:1.2em;" onclick="closeLogModal()">✕</span>
+        </h2>
+        <div id="logList" style="margin-top: 10px;">Yükleniyor...</div>
+    </div>
+</div>
+
+<div id="editModal" class="hidden">
+    <div class="modal-content" style="max-width:340px;">
+        <h3 id="editModalTitle" style="color:#38bdf8;margin-top:0;">Düzenle</h3>
+        
+        <div id="editBlockFields" class="hidden">
+            <label>Blok Adı</label>
+            <input type="text" id="editBlockNameInput" style="margin-bottom:10px;">
+            <label>Kat Planı Seç (Mimarisi)</label>
+            <select id="editBlockPlanSel" style="margin-bottom:15px;"></select>
+        </div>
+
+        <div id="editTypeFields" class="hidden">
+            <label>İmalat Adı</label><input type="text" id="editTypeNameInput" style="margin-bottom:10px;">
+            <label>Renk</label><div class="color-row" id="editTypeColorSwatches" style="margin-bottom:15px;"></div>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-green" onclick="saveEditModal()">💾 Kaydet</button>
+            <button class="btn btn-gray" onclick="closeEditModal()">İptal</button>
+        </div>
+    </div>
+</div>
+
+<div id="userModal" class="hidden">
+    <div class="modal-content">
+        <h2 style="display:flex; justify-content:space-between; margin-top:0; margin-bottom: 15px;">
+            Saha Ekibi Yönetimi 
+            <span style="cursor:pointer; color:#ef4444; font-size:1.2em;" onclick="closeUserManager()">✕</span>
+        </h2>
+        <button class="btn btn-blue" id="btnAddNewUser" onclick="openAddUser()" style="margin-bottom: 15px;">+ Yeni Saha Mühendisi Ekle</button>
+        <div id="userModalList">Yükleniyor...</div>
+        
+        <div id="userModalAdd" class="hidden" style="margin-top: 5px; border-top: 1px solid #334155; padding-top: 15px;">
+            <h3 style="color:#10b981; margin-top:0; font-size:1em;">Yeni Kişi Ekle</h3>
+            <label>Kullanıcı Adı (Boşluk bırakmayın)</label><input type="text" id="addUserName" placeholder="Örn: ahmet_yilmaz" style="margin-bottom: 8px;">
+            <label>Geçici Şifre</label><input type="text" id="addUserPass" placeholder="Örn: 123456" style="margin-bottom: 8px;">
+            <label>Rol</label>
+            <select id="addUserRole" style="margin-bottom: 8px;">
+                <option value="user">Saha Mühendisi (Kullanıcı)</option>
+                <option value="admin">Şantiye Şefi (Admin)</option>
+            </select>
+            <div class="btn-row" style="margin-top:15px;">
+                <button class="btn btn-green" onclick="submitNewUser()">💾 Sistemi Kaydet</button>
+                <button class="btn btn-gray" onclick="cancelAddUser()">İptal</button>
+            </div>
+        </div>
+
+        <div id="userModalEdit" class="hidden" style="margin-top: 5px; border-top: 1px solid #334155; padding-top: 15px;">
+            <h3 style="color:#38bdf8; margin-top:0; font-size:1em;">Kişiyi Düzenle</h3>
+            <label>Kullanıcı Adı</label><input type="text" id="editUserLoginName" style="margin-bottom: 8px; border-color:#38bdf8;">
+            <label>Yeni Şifre (Değiştirmeyecekseniz boş bırakın)</label><input type="text" id="editUserPass" placeholder="******" style="margin-bottom: 12px; border-color:#475569;">
+            <label>Sorumlu Olduğu Bloklar</label><div id="editBlocksContainer" class="chip-group"></div>
+            <label>Sorumlu Olduğu İmalatlar</label><div id="editTypesContainer" class="chip-group"></div>
+            <label>Rol</label>
+            <select id="editRole">
+                <option value="admin">Şantiye Şefi (Tam Yetki)</option>
+                <option value="user">Saha Mühendisi / Taşeron</option>
+            </select>
+            <div class="btn-row" style="margin-top:15px;">
+                <button class="btn btn-green" onclick="saveUserTasks()">💾 Kaydet</button>
+                <button class="btn btn-red" onclick="deleteSelectedUser()" title="Sil">🗑️ Sil</button>
+                <button class="btn btn-gray" onclick="cancelUserEdit()">İptal</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+
+// ============================
+// APP STATE
+// ============================
+const PALETTE_COLORS = ['#3b82f6','#f97316','#f1f5f9','#10b981','#a855f7','#ec4899','#f59e0b','#06b6d4','#84cc16','#ef4444'];
+const PALETTE_HEX    = [0x3b82f6, 0xf97316, 0xf1f5f9, 0x10b981, 0xa855f7, 0xec4899, 0xf59e0b, 0x06b6d4, 0x84cc16, 0xef4444];
+
+let constructionTypes = [
+    { name: 'Betonarme', colorHex: 0x3b82f6, colorCSS: '#3b82f6' },
+    { name: 'Duvar',     colorHex: 0xf97316, colorCSS: '#f97316' },
+    { name: 'Sıva',      colorHex: 0xf1f5f9, colorCSS: '#f1f5f9' }
+];
+
+let floorPlans = [
+    { name: 'Standart 6 Kat', floorNames: ['1. Kat','2. Kat','3. Kat','4. Kat','5. Kat','6. Kat'] }
+];
+
+let blockDefs = [
+    { name: 'ADA',    floors: 6, x: -6, z: 0, planName: 'Standart 6 Kat', floorNames: ['1. Kat','2. Kat','3. Kat','4. Kat','5. Kat','6. Kat'], rY: 0 },
+    { name: 'BLOCK3', floors: 6, x: 6,  z: 0, planName: 'Standart 6 Kat', floorNames: ['1. Kat','2. Kat','3. Kat','4. Kat','5. Kat','6. Kat'], rY: 0 },
+];
+
+let selectedBlockName = blockDefs[0]?.name;
+let selectedColorIdx = 0;
+let dragMode = false;
+let isDragging = false;
+let dragBlock = null;
+let dragPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+let dragOffset = new THREE.Vector3();
+
+// ============================
+// THREE.JS SETUP
+// ============================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0f172a);
+const gridHelper = new THREE.GridHelper(40, 40, 0x1e3a5f, 0x1e2a3f);
+scene.add(gridHelper);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.shadowMap.enabled = true;
+document.getElementById('viewport').appendChild(renderer.domElement);
+const orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
+orbitControls.enableDamping = true;
+orbitControls.target.set(0, 3, 0);
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+dirLight.position.set(15, 25, 15);
+dirLight.castShadow = true;
+scene.add(dirLight);
+camera.position.set(16, 14, 16);
+
+// ============================
+// PROGRESS HESAPLAMA
+// ============================
+function updateProgress() {
+    let totalItems = 0; let completedItems = 0;
+    Object.values(buildings).forEach(b => {
+        b.floors.forEach(f => {
+            constructionTypes.forEach(t => {
+                totalItems++; if (f.userData.states[t.name] === 2) completedItems++;
+            });
+        });
+    });
+    const pct = totalItems === 0 ? 0 : Math.round((completedItems / totalItems) * 100);
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressText').textContent = '%' + pct + ' Tamamlandı';
+}
+
+// ============================
+// BUILDINGS MAP & YENİ GEOMETRİ
+// ============================
+const buildings = {};
+function getTypeColor(typeName, state) {
+    if (state === 0) return 0x475569; if (state === 1) return 0xeab308;
+    const t = constructionTypes.find(t => t.name === typeName); return t ? t.colorHex : 0x10b981;
+}
+function buildFloorStates(types) { const s = {}; types.forEach(t => { s[t.name] = 0; }); return s; }
+function ensureFloorHasAllTypes(floor) { constructionTypes.forEach(t => { if (!(t.name in floor.userData.states)) floor.userData.states[t.name] = 0; }); }
+
+function createBlockMeshes(def) {
+    if (buildings[def.name]) scene.remove(buildings[def.name].pivot);
+    
+    const pivot = new THREE.Group(); 
+    pivot.position.set(def.x, 0, def.z ?? 0); 
+    pivot.rotation.y = (def.rY || 0) * (Math.PI / 180);
+    pivot.userData.blockName = def.name; 
+    scene.add(pivot);
+    
+    const floors = [];
+    
+    // Blok boyutları (geniş x dar dikdörtgen)
+    const BW = 6.0; const BD = 3.5; const BH = 0.75;
+
+    // BİNA GİRİŞİ — daha belirgin, dikdörtgen binaya göre ayarlı
+    const HALF_D = BD / 2; // 1.75
+    // Kapı çerçevesi (koyu)
+    const doorFrameMat = new THREE.MeshStandardMaterial({ color: 0x0f172a });
+    const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.0, 0.15), doorFrameMat);
+    doorFrame.position.set(0, 0.5, HALF_D + 0.07);
+    pivot.add(doorFrame);
+    // Kapı yüzeyi (cam efekti, açık mavi)
+    const doorGlassMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.55, metalness: 0.4 });
+    const doorGlass = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.85, 0.05), doorGlassMat);
+    doorGlass.position.set(0, 0.5, HALF_D + 0.12);
+    pivot.add(doorGlass);
+    // Sundurma (geniş, belirgin mavi)
+    const canopyMat = new THREE.MeshStandardMaterial({ color: 0x0ea5e9, metalness: 0.3, roughness: 0.4 });
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.12, 1.0), canopyMat);
+    canopy.position.set(0, 1.05, HALF_D + 0.5);
+    pivot.add(canopy);
+    // Sundurma direkleri
+    const postMat = new THREE.MeshStandardMaterial({ color: 0x334155 });
+    [-1.0, 1.0].forEach(xOff => {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.05, 0.1), postMat);
+        post.position.set(xOff, 0.525, HALF_D + 0.95);
+        pivot.add(post);
+    });
+    // GİRİŞ ok işareti (sprite — her açıdan görünür)
+    const arrowCanvas = document.createElement('canvas'); arrowCanvas.width = 128; arrowCanvas.height = 128;
+    const actx = arrowCanvas.getContext('2d');
+    actx.fillStyle = '#0ea5e9'; actx.beginPath(); actx.moveTo(64, 10); actx.lineTo(110, 70); actx.lineTo(80, 70); actx.lineTo(80, 118); actx.lineTo(48, 118); actx.lineTo(48, 70); actx.lineTo(18, 70); actx.closePath(); actx.fill();
+    const arrowTex = new THREE.CanvasTexture(arrowCanvas);
+    const arrowSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: arrowTex, transparent: true }));
+    arrowSprite.scale.set(0.7, 0.7, 1);
+    arrowSprite.position.set(0, 1.6, HALF_D + 0.5);
+    pivot.add(arrowSprite);
+    // "GİRİŞ" yazı etiketi
+    const entCanvas = document.createElement('canvas'); entCanvas.width = 256; entCanvas.height = 64;
+    const ectx = entCanvas.getContext('2d');
+    ectx.fillStyle = 'rgba(14,165,233,0.85)'; ectx.roundRect(4, 4, 248, 56, 10); ectx.fill();
+    ectx.fillStyle = '#ffffff'; ectx.font = 'bold 30px Segoe UI'; ectx.textAlign = 'center'; ectx.textBaseline = 'middle'; ectx.fillText('⬇ GİRİŞ', 128, 32);
+    const entTex = new THREE.CanvasTexture(entCanvas);
+    const entSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: entTex, transparent: true }));
+    entSprite.scale.set(2.0, 0.5, 1);
+    entSprite.position.set(0, 2.1, HALF_D + 0.5);
+    pivot.add(entSprite);
+
+    // (BW, BD, BH yukarıda tanımlandı)
+
+    for (let i = 0; i < def.floors; i++) {
+        const geo = new THREE.BoxGeometry(BW, BH, BD);
+        const mat = new THREE.MeshStandardMaterial({ color: 0x475569 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(0, i * 0.9 + 0.375, 0); mesh.castShadow = true;
+        
+        const defaultName = (i + 1) + ". Kat";
+        const fName = (def.floorNames && def.floorNames[i]) ? def.floorNames[i] : defaultName;
+
+        mesh.userData = { block: def.name, floor: i + 1, floorName: fName, states: buildFloorStates(constructionTypes) };
+        
+        const fc = document.createElement('canvas'); fc.width = 256; fc.height = 64; const fctx = fc.getContext('2d');
+        fctx.fillStyle = 'rgba(15, 23, 42, 0.75)'; fctx.roundRect(16, 8, 224, 48, 8); fctx.fill();
+        fctx.fillStyle = '#38bdf8'; fctx.font = 'bold 22px Segoe UI'; fctx.textAlign = 'center'; fctx.textBaseline = 'middle'; fctx.fillText(fName, 128, 32);
+        
+        const fTex = new THREE.CanvasTexture(fc); const fMat = new THREE.SpriteMaterial({ map: fTex, transparent: true });
+        // Sağ taraf etiketi
+        const fSprite = new THREE.Sprite(fMat);
+        fSprite.scale.set(2.0, 0.45, 1); 
+        fSprite.position.set(BW / 2 + 1.1, 0, 0); 
+        mesh.add(fSprite);
+        // Sol taraf etiketi (aynı doku — Sprite her zaman kameraya bakar)
+        const fSpriteL = new THREE.Sprite(fMat);
+        fSpriteL.scale.set(2.0, 0.45, 1);
+        fSpriteL.position.set(-(BW / 2 + 1.1), 0, 0);
+        mesh.add(fSpriteL);
+        
+        pivot.add(mesh); floors.push(mesh);
+    }
+
+    // ── BLOK İSMİ SPRITE (Her açıdan okunabilir — Sprite kameraya bakar) ──
+    const canvas = document.createElement('canvas'); canvas.width = 384; canvas.height = 80; const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'rgba(14,165,233,0.9)'; ctx.roundRect(4,4,376,72,14); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 36px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(def.name, 192, 40);
+    
+    const tex = new THREE.CanvasTexture(canvas); 
+    const labelMat = new THREE.SpriteMaterial({ map: tex, transparent: true }); 
+    const label = new THREE.Sprite(labelMat);
+    label.scale.set(4.5, 0.9, 1); 
+    label.position.set(0, def.floors * 0.9 + 1.4, 0); 
+    label.userData.isLabel = true;
+    pivot.add(label);
+
+    // Görünmez tıklama alanı — blok ismi spriteının üzerine denk gelir
+    const hitGeo = new THREE.BoxGeometry(5.0, 1.0, 0.5);
+    const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+    const hitBox = new THREE.Mesh(hitGeo, hitMat);
+    hitBox.position.set(0, def.floors * 0.9 + 1.4, 0);
+    hitBox.userData.isBlockLabel = true;
+    hitBox.userData.blockName = def.name;
+    pivot.add(hitBox);
+
+    buildings[def.name] = { floors, pivot, def, hitBox }; updateProgress();
+}
+
+function refreshSceneColors() {
+    const type = document.getElementById('typeSel').value;
+    Object.values(buildings).forEach(b => { b.floors.forEach(f => { ensureFloorHasAllTypes(f); f.material.color.setHex(getTypeColor(type, f.userData.states[type] || 0)); }); });
+    updateProgress();
+}
+
+function rotateCurrentBlock(deg) {
+    if (!selectedBlockName || !currentUser?.isAdmin) return;
+    const def = blockDefs.find(d => d.name === selectedBlockName);
+    const b = buildings[selectedBlockName];
+    if (def && b) {
+        def.rY = (def.rY || 0) + deg;
+        b.pivot.rotation.y = def.rY * (Math.PI / 180);
+        if (sheetsConnected) setStatus('⚠️ Yön değişti, KAYDET butonuna basmayı unutmayın!', 'status-load');
+    }
+}
+
+const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
+function getAllFloorMeshes() { return Object.values(buildings).flatMap(b => b.floors); }
+function getAllHitBoxes() { return Object.values(buildings).map(b => b.hitBox).filter(Boolean); }
+
+renderer.domElement.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return; const bounds = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - bounds.left) / bounds.width) * 2 - 1; mouse.y = -((e.clientY - bounds.top) / bounds.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+
+    if (dragMode) {
+        const intersects = raycaster.intersectObjects(getAllFloorMeshes(), false);
+        if (intersects.length > 0) {
+            const hit = intersects[0].object;
+            if (hit.userData.block) {
+                const bName = hit.userData.block;
+                if (!canDragBlock(bName)) { showFloorHint('🔒 Taşıma yetkiniz yok'); return; }
+                dragBlock = buildings[bName].pivot; isDragging = true; orbitControls.enabled = false;
+                dragPlane.set(new THREE.Vector3(0,1,0), 0); const pt = new THREE.Vector3(); raycaster.ray.intersectPlane(dragPlane, pt);
+                dragOffset.copy(dragBlock.position).sub(pt); dragOffset.y = 0; selectedBlockName = bName; renderBlockList();
+            }
+        }
+    } else {
+        // Önce blok ismi tıklama alanlarını kontrol et → popup aç
+        const labelHits = raycaster.intersectObjects(getAllHitBoxes(), false);
+        if (labelHits.length > 0) {
+            const h = labelHits[0].object;
+            if (h.userData.isBlockLabel) {
+                selectedBlockName = h.userData.blockName;
+                renderBlockList();
+                openBlockPopup(h.userData.blockName, null, document.getElementById('typeSel').value);
+                return;
+            }
+        }
+
+        // Sonra kat mesh'lerini kontrol et → veri girişi (popup açılmaz)
+        const intersects = raycaster.intersectObjects(getAllFloorMeshes(), false);
+        if (intersects.length > 0) {
+            const floor = intersects[0].object;
+            if (floor.userData.block) {
+                const type = document.getElementById('typeSel').value;
+                if (editLocked) { showLockWarning(); return; }
+                if (!canEditBlock(floor.userData.block)) { showInfo(floor, type, '🔒 Bloğu düzenleme yetkiniz yok'); return; }
+                if (!canEditType(type)) { showInfo(floor, type, '🔒 İmalat türünü düzenleme yetkiniz yok'); return; }
+                ensureFloorHasAllTypes(floor); floor.userData.states[type] = (floor.userData.states[type] + 1) % 3;
+                refreshSceneColors(); autoSaveState(floor, type);
+                selectedBlockName = floor.userData.block; renderBlockList();
+                // Popup zaten açıksa güncelle
+                if (popupBlockTarget === floor.userData.block) openBlockPopup(floor.userData.block, floor, type);
+            }
+        }
+    }
+});
+
+renderer.domElement.addEventListener('pointermove', (e) => {
+    if (!isDragging || !dragBlock) return; const bounds = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - bounds.left) / bounds.width) * 2 - 1; mouse.y = -((e.clientY - bounds.top) / bounds.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera); const pt = new THREE.Vector3(); raycaster.ray.intersectPlane(dragPlane, pt);
+    const snapSize = 1.0; const targetX = pt.x + dragOffset.x; const targetZ = pt.z + dragOffset.z;
+    dragBlock.position.x = Math.round(targetX / snapSize) * snapSize; dragBlock.position.z = Math.round(targetZ / snapSize) * snapSize;
+    const bName = dragBlock.userData.blockName; const def = blockDefs.find(d => d.name === bName);
+    if (def) { def.x = dragBlock.position.x; def.z = dragBlock.position.z; }
+});
+renderer.domElement.addEventListener('pointerup', () => { if (isDragging) { isDragging = false; dragBlock = null; orbitControls.enabled = true; } });
+
+// ============================
+// DÜZENLEME MODALI FONKSİYONLARI 
+// ============================
+let editingEntity = null; let editSelectedColorIdx = 0;
+
+function openEditBlock(name) {
+    if (!currentUser?.isAdmin) return;
+    const def = blockDefs.find(d => d.name === name); if (!def) return;
+    editingEntity = { type: 'block', oldName: name };
+    document.getElementById('editModalTitle').textContent = 'Blok Düzenle';
+    document.getElementById('editBlockNameInput').value = def.name;
+    document.getElementById('editBlockPlanSel').value = def.planName || (floorPlans.length > 0 ? floorPlans[0].name : '');
+    
+    document.getElementById('editBlockFields').classList.remove('hidden');
+    document.getElementById('editTypeFields').classList.add('hidden');
+    document.getElementById('editModal').classList.remove('hidden');
+}
+
+function openEditType(name) {
+    if (!currentUser?.isAdmin) return;
+    const tObj = constructionTypes.find(t => t.name === name); if (!tObj) return;
+    editingEntity = { type: 'type', oldName: name }; document.getElementById('editModalTitle').textContent = 'İmalat Düzenle';
+    document.getElementById('editTypeNameInput').value = tObj.name;
+    editSelectedColorIdx = PALETTE_COLORS.indexOf(tObj.colorCSS); if(editSelectedColorIdx === -1) editSelectedColorIdx = 0;
+    renderEditColorSwatches();
+    document.getElementById('editTypeFields').classList.remove('hidden'); document.getElementById('editBlockFields').classList.add('hidden'); document.getElementById('editModal').classList.remove('hidden');
+}
+
+function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); editingEntity = null; }
+function renderEditColorSwatches() { const container = document.getElementById('editTypeColorSwatches'); container.innerHTML = ''; PALETTE_COLORS.forEach((c, i) => { const div = document.createElement('div'); div.className = 'color-swatch' + (i === editSelectedColorIdx ? ' selected' : ''); div.style.background = c; div.onclick = () => { editSelectedColorIdx = i; renderEditColorSwatches(); }; container.appendChild(div); }); }
+
+function saveEditModal() {
+    if (editingEntity.type === 'block') {
+        const newName = document.getElementById('editBlockNameInput').value.trim().toUpperCase();
+        const selPlanName = document.getElementById('editBlockPlanSel').value;
+        const plan = floorPlans.find(p => p.name === selPlanName);
+
+        if (!newName) { alert('Boş olamaz!'); return; }
+        if (!plan) { alert('Plan seçiniz!'); return; }
+        if (newName !== editingEntity.oldName && buildings[newName]) { alert('İsim kullanımda!'); return; }
+        
+        const oldName = editingEntity.oldName; const def = blockDefs.find(d => d.name === oldName);
+        if (newName !== oldName && sheetsConnected) gasPOST({ action: 'renameEntity', data: { entity: 'block', oldName: oldName, newName: newName } });
+        
+        const oldStates = {}; buildings[oldName].floors.forEach((f, i) => { oldStates[i] = JSON.parse(JSON.stringify(f.userData.states)); });
+        
+        def.name = newName; 
+        def.planName = plan.name;
+        def.floors = plan.floorNames.length; 
+        def.floorNames = [...plan.floorNames];
+
+        scene.remove(buildings[oldName].pivot); delete buildings[oldName]; createBlockMeshes(def);
+        buildings[newName].floors.forEach((f, i) => { if (oldStates[i]) f.userData.states = oldStates[i]; });
+        if (selectedBlockName === oldName) selectedBlockName = newName;
+        renderBlockList(); refreshSceneColors();
+    } else if (editingEntity.type === 'type') {
+        const newName = document.getElementById('editTypeNameInput').value.trim();
+        if (!newName) { alert('Boş olamaz!'); return; }
+        if (newName !== editingEntity.oldName && constructionTypes.find(t => t.name === newName)) { alert('Kullanımda!'); return; }
+        const oldName = editingEntity.oldName; const tObj = constructionTypes.find(t => t.name === oldName);
+        if (newName !== oldName && sheetsConnected) gasPOST({ action: 'renameEntity', data: { entity: 'type', oldName: oldName, newName: newName } });
+        tObj.name = newName; tObj.colorHex = PALETTE_HEX[editSelectedColorIdx]; tObj.colorCSS = PALETTE_COLORS[editSelectedColorIdx];
+        Object.values(buildings).forEach(b => { b.floors.forEach(f => { if (oldName in f.userData.states) { f.userData.states[newName] = f.userData.states[oldName]; if (newName !== oldName) delete f.userData.states[oldName]; } }); });
+        renderTypeList(); renderTypeSelect(); refreshSceneColors();
+    }
+    closeEditModal();
+}
+
+// ============================
+// KAT PLANLARI YÖNETİMİ 
+// ============================
+function addPlan() {
+    const name = document.getElementById('newPlanName').value.trim();
+    const floorsStr = document.getElementById('newPlanFloors').value;
+    const floorNames = floorsStr ? floorsStr.split(',').map(s=>s.trim()).filter(Boolean) : [];
+    
+    if (!name || floorNames.length === 0) return alert('İsim ve en az 1 kat adı girmelisiniz!');
+    if (floorPlans.find(p => p.name === name)) return alert('Bu isimde bir plan zaten var!');
+    
+    floorPlans.push({ name, floorNames });
+    document.getElementById('newPlanName').value = ''; document.getElementById('newPlanFloors').value = '';
+    renderPlanList(); renderPlanSelects();
+}
+
+function removePlan(name) {
+    if (floorPlans.length <= 1) return alert('En az 1 plan kalmalıdır!');
+    if (!confirm('Bu planı silmek istediğinize emin misiniz? Mevcut bloklar etkilenmez.')) return;
+    floorPlans = floorPlans.filter(p => p.name !== name);
+    renderPlanList(); renderPlanSelects();
+}
+
+function renderPlanList() {
+    const list = document.getElementById('planList'); list.innerHTML = '';
+    floorPlans.forEach(p => {
+        const li = document.createElement('li'); 
+        let adminBtns = currentUser?.isAdmin ? `<div class="action-btns"><span class="remove-btn" onclick="removePlan('${p.name}')">✕</span></div>` : '';
+        li.innerHTML = `<span class="type-name"><b>${p.name}</b> <span style="color:#64748b;font-size:0.8em">(${p.floorNames.length} Kat)</span></span>${adminBtns}`; 
+        list.appendChild(li);
+    });
+}
+
+function renderPlanSelects() {
+    const sels = [document.getElementById('newBlockPlanSel'), document.getElementById('editBlockPlanSel')];
+    sels.forEach(sel => {
+        if (!sel) return; const prev = sel.value; sel.innerHTML = '';
+        floorPlans.forEach(p => { const opt = document.createElement('option'); opt.value = p.name; opt.textContent = p.name + ` (${p.floorNames.length} Kat)`; sel.appendChild(opt); });
+        if (floorPlans.find(p => p.name === prev)) sel.value = prev;
+    });
+}
+
+// ============================
+// BLOK & İMALAT YÖNETİMİ
+// ============================
+function addBlock() {
+    const name = document.getElementById('newBlockName').value.trim().toUpperCase(); 
+    const planName = document.getElementById('newBlockPlanSel').value;
+    const plan = floorPlans.find(p => p.name === planName);
+    
+    if (!name) return alert('Blok ismi giriniz!'); 
+    if (buildings[name]) return alert('Bu isimde blok zaten var!');
+    if (!plan) return alert('Lütfen bir Kat Planı seçin!');
+
+    const newX = (blockDefs.length > 0 ? Math.max(...blockDefs.map(d => d.x)) : -4) + 5;
+    const def = { name, floors: plan.floorNames.length, x: newX, planName: plan.name, floorNames: [...plan.floorNames], rY: 0 }; 
+    blockDefs.push(def); createBlockMeshes(def);
+    
+    document.getElementById('newBlockName').value = ''; selectedBlockName = name; renderBlockList(); refreshSceneColors();
+}
+
+function removeBlock(name) {
+    if (!confirm('Sileyim mi?')) return; scene.remove(buildings[name].pivot); delete buildings[name]; blockDefs = blockDefs.filter(d => d.name !== name);
+    if (selectedBlockName === name) selectedBlockName = blockDefs[0]?.name || null; deleteBlockFromSheets(name); renderBlockList(); updateProgress();
+}
+function selectBlock(name) { selectedBlockName = name; renderBlockList(); }
+function renderBlockList() {
+    const list = document.getElementById('blockList'); list.innerHTML = '';
+    blockDefs.forEach(def => {
+        const li = document.createElement('li'); li.className = def.name === selectedBlockName ? 'selected' : '';
+        let adminBtns = currentUser?.isAdmin ? `<div class="action-btns"><span class="edit-btn" onclick="openEditBlock('${def.name}')">✏️</span><span class="remove-btn" onclick="removeBlock('${def.name}')">✕</span></div>` : '';
+        li.innerHTML = `<span class="block-name" onclick="selectBlock('${def.name}')">${def.name}</span><span class="block-floors" onclick="selectBlock('${def.name}')">${def.planName || def.floors+' kat'}</span>${adminBtns}`; list.appendChild(li);
+    });
+}
+function addType() {
+    const name = document.getElementById('newTypeName').value.trim(); if (!name) return alert('İsim giriniz!'); if (constructionTypes.find(t => t.name === name)) return alert('Var!');
+    constructionTypes.push({ name, colorHex: PALETTE_HEX[selectedColorIdx], colorCSS: PALETTE_COLORS[selectedColorIdx] });
+    Object.values(buildings).forEach(b => { b.floors.forEach(f => { f.userData.states[name] = 0; }); }); document.getElementById('newTypeName').value = ''; renderTypeList(); renderTypeSelect(); updateProgress();
+}
+function removeType(name) { if (constructionTypes.length <= 1) return alert('En az 1 kalmalı!'); constructionTypes = constructionTypes.filter(t => t.name !== name); renderTypeList(); renderTypeSelect(); refreshSceneColors(); }
+function renderTypeList() {
+    const list = document.getElementById('typeList'); list.innerHTML = '';
+    constructionTypes.forEach(t => {
+        const li = document.createElement('li'); let adminBtns = currentUser?.isAdmin ? `<div class="action-btns"><span class="edit-btn" onclick="openEditType('${t.name}')">✏️</span><span class="remove-btn" onclick="removeType('${t.name}')">✕</span></div>` : '';
+        li.innerHTML = `<div style="display:flex; align-items:center; flex:1;"><span class="color-dot" style="background:${t.colorCSS}"></span><span class="type-name">${t.name}</span></div>${adminBtns}`; list.appendChild(li);
+    });
+}
+function renderTypeSelect() {
+    const sel = document.getElementById('typeSel'); const prev = sel.value; sel.innerHTML = '';
+    constructionTypes.forEach(t => { const opt = document.createElement('option'); opt.value = t.name; opt.textContent = t.name; sel.appendChild(opt); });
+    if (constructionTypes.find(t => t.name === prev)) sel.value = prev; refreshSceneColors();
+}
+function renderColorSwatches() { const container = document.getElementById('colorSwatches'); container.innerHTML = ''; PALETTE_COLORS.forEach((c, i) => { const div = document.createElement('div'); div.className = 'color-swatch' + (i === selectedColorIdx ? ' selected' : ''); div.style.background = c; div.onclick = () => { selectedColorIdx = i; renderColorSwatches(); }; container.appendChild(div); }); }
+
+// ============================
+// KİLİT & OPS
+// ============================
+let editLocked = true;
+function toggleEditLock() { editLocked = !editLocked; updateLockBtn(); }
+function updateLockBtn() { const btn = document.getElementById('lockBtn'); if (!btn) return; if (editLocked) { btn.textContent = '🔒 Düzenleme Kapalı — Açmak için dokun'; btn.style.background = '#475569'; } else { btn.textContent = '✏️ Düzenleme Açık — Kilitlemek için dokun'; btn.style.background = '#10b981'; } }
+function toggleDragMode() {
+    if (editLocked) { showLockWarning(); return; } dragMode = !dragMode; const btn = document.getElementById('dragModeBtn');
+    btn.textContent = 'Taşıma Modu: ' + (dragMode ? 'AÇIK' : 'KAPALI'); btn.style.background = dragMode ? '#10b981' : '#eab308'; btn.style.color = dragMode ? 'white' : '#0f172a';
+    document.getElementById('modeIndicator').style.display = dragMode ? 'block' : 'none'; orbitControls.enabled = !dragMode || !isDragging; if (!dragMode) orbitControls.enabled = true;
+}
+
+function updateCurrentBlock(val) {
+    if (!selectedBlockName) return; if (editLocked) { showLockWarning(); return; }
+    const currentType = document.getElementById('typeSel').value;
+    if (!canEditBlock(selectedBlockName)) { setStatus('🔒 Bloğu düzenleme yetkiniz yok', 'status-err'); return; }
+    if (!canEditType(currentType)) { setStatus('🔒 İmalat yetkiniz yok', 'status-err'); return; }
+    buildings[selectedBlockName]?.floors.forEach(f => { ensureFloorHasAllTypes(f); f.userData.states[currentType] = val; }); refreshSceneColors();
+    if (sheetsConnected) { buildings[selectedBlockName]?.floors.forEach(f => autoSaveState(f, currentType)); }
+}
+
+// ============================
+// BLOK POPUP KARTI
+// ============================
+let popupBlockTarget = null;
+
+function openBlockPopup(blockName, clickedFloor, activeType) {
+    const b = buildings[blockName];
+    if (!b) return;
+    popupBlockTarget = blockName;
+
+    // Başlık
+    document.getElementById('popupBlockName').textContent = blockName;
+    document.getElementById('popupBlockMeta').textContent = b.def.floors + ' Kat  •  ' + (b.def.planName || '');
+
+    // Genel tamamlanma
+    let total = 0, completed = 0;
+    b.floors.forEach(f => {
+        constructionTypes.forEach(t => { total++; if ((f.userData.states[t.name] || 0) === 2) completed++; });
+    });
+    const pct = total === 0 ? 0 : Math.round((completed / total) * 100);
+    document.getElementById('popupTotalPct').textContent = '%' + pct;
+    setTimeout(() => { document.getElementById('popupTotalBar').style.width = pct + '%'; }, 30);
+
+    // İmalat bazında barlar
+    const rows = document.getElementById('popupTypeRows');
+    rows.innerHTML = '';
+    constructionTypes.forEach(t => {
+        let tTotal = 0, tDone = 0, tProgress = 0;
+        b.floors.forEach(f => {
+            const st = f.userData.states[t.name] || 0;
+            tTotal++;
+            if (st === 2) tDone++;
+            else if (st === 1) tProgress++;
+        });
+        const tPct = tTotal === 0 ? 0 : Math.round((tDone / tTotal) * 100);
+        const tProg = tTotal === 0 ? 0 : Math.round(((tDone + tProgress * 0.5) / tTotal) * 100);
+
+        const row = document.createElement('div');
+        row.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${t.colorCSS};flex-shrink:0;"></span>
+                    <span style="font-size:0.78em; color:#cbd5e1;">${t.name}</span>
+                </div>
+                <div style="font-size:0.72em; color:#64748b;">
+                    <span style="color:${tPct===100?'#10b981':'#94a3b8'}; font-weight:${tPct===100?'bold':'normal'};">${tDone}</span>/<span>${tTotal}</span> kat
+                    <span style="margin-left:6px; color:${tPct===100?'#10b981':tPct>0?'#eab308':'#475569'}; font-weight:bold;">%${tPct}</span>
+                </div>
+            </div>
+            <div style="background:#1e293b; border-radius:4px; height:7px; overflow:hidden;">
+                <div style="height:100%; border-radius:4px; background:${t.colorCSS}; width:${tProg}%; transition:width 0.5s ease; opacity:0.85;"></div>
+            </div>`;
+        rows.appendChild(row);
+    });
+
+    // Seçili kat detayı
+    if (clickedFloor) {
+        const st = clickedFloor.userData.states[activeType] || 0;
+        const stLabels = ['⬜ Başlamadı', '🟡 Devam Ediyor', '✅ Tamamlandı'];
+        document.getElementById('popupFloorDetail').innerHTML =
+            `<b style="color:#38bdf8;">${clickedFloor.userData.floorName}</b> &nbsp;—&nbsp; ${activeType}: <b>${stLabels[st]}</b>`;
+        document.getElementById('popupFloorInfo').style.display = 'block';
+    } else {
+        document.getElementById('popupFloorInfo').style.display = 'none';
+    }
+
+    document.getElementById('blockPopup').style.display = 'block';
+}
+
+function closeBlockPopup() {
+    document.getElementById('blockPopup').style.display = 'none';
+    popupBlockTarget = null;
+}
+
+function showFloorHint(msg) {
+    const el = document.getElementById('floorHint');
+    const txt = document.getElementById('floorHintText');
+    txt.textContent = msg;
+    el.style.display = 'block';
+    clearTimeout(showFloorHint._timer);
+    showFloorHint._timer = setTimeout(() => { el.style.display = 'none'; }, 2500);
+}
+
+function showInfo(f, t, overrideMsg) {
+    if (overrideMsg) { showFloorHint(overrideMsg); }
+}
+
+function showLockWarning() {
+    showFloorHint('🔒 Düzenleme kilitli — Sol panelden kilidi açın');
+}
+
+// ============================
+// GOOGLE SHEETS ENTEGRASYONU & AUTH
+// ============================
+let SCRIPT_URL = localStorage.getItem('scriptUrl') || '';
+let sheetsConnected = false; let currentUser = null; let SESSION_TOKEN = localStorage.getItem('sessionToken') || '';
+
+document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !document.getElementById('loginScreen').classList.contains('hidden')) doLogin(); });
+window.addEventListener('load', () => {
+    const savedUrl = localStorage.getItem('scriptUrl') || ''; if (savedUrl) document.getElementById('loginUrl').value = savedUrl;
+    const saved = localStorage.getItem('insaatUser');
+    if (saved && SESSION_TOKEN) {
+        try {
+            const raw = JSON.parse(saved); const allowedBlocks = Array.isArray(raw.allowedBlocks) ? raw.allowedBlocks : parseList(raw.allowedBlocks); const allowedTypes  = Array.isArray(raw.allowedTypes)  ? raw.allowedTypes  : parseList(raw.allowedTypes);
+            currentUser = { ...raw, allowedBlocks, allowedTypes, isAdmin: allowedBlocks.includes('*') && allowedTypes.includes('*'), isViewer: allowedBlocks.length === 0 && allowedTypes.length === 0 };
+            SCRIPT_URL  = localStorage.getItem('scriptUrl') || ''; document.getElementById('scriptUrl').value = SCRIPT_URL; showApp(); connectSheets();
+        } catch(e) { showLoginScreen(); }
+    } else { showLoginScreen(); }
+});
+
+function showLoginScreen() { document.getElementById('loginScreen').classList.remove('hidden'); }
+function showApp() {
+    document.getElementById('loginScreen').classList.add('hidden'); document.getElementById('userBadge').style.display = 'flex'; document.getElementById('userNameLabel').textContent = currentUser.username; document.getElementById('userRoleLabel').textContent = roleLabel(currentUser.role); document.getElementById('userAvatar').textContent = currentUser.username.charAt(0).toUpperCase();
+    if (!currentUser.isViewer) { document.getElementById('lockBtn').style.display = ''; editLocked = true; updateLockBtn(); } applyPermissions();
+}
+function roleLabel(r) { return currentUser?.isAdmin ? '👑 ' + r : currentUser?.isViewer ? '👁️ ' + r : '🔧 ' + r; }
+
+async function doLogin() {
+    const urlVal  = document.getElementById('loginUrl').value.trim(); const userVal = document.getElementById('loginUser').value.trim(); const passVal = document.getElementById('loginPass').value; const errEl   = document.getElementById('loginError');
+    if (!urlVal || !userVal || !passVal) { errEl.textContent = 'Eksik bilgi girdiniz'; return; }
+    errEl.textContent = '⏳ Doğrulanıyor...'; SCRIPT_URL = urlVal; localStorage.setItem('scriptUrl', urlVal);
+    try {
+        const res = await gasGET({ action: 'login', username: userVal, password: passVal });
+        if (!res.ok) { errEl.textContent = '❌ ' + (res.error || 'Giriş başarısız'); return; }
+        SESSION_TOKEN = res.token; localStorage.setItem('sessionToken', SESSION_TOKEN);
+        const allowedBlocks = parseList(res.user.YetkiliBloklar); const allowedTypes  = parseList(res.user.YetkiliImalatlar);
+        currentUser = { username: res.user.KullaniciAdi, role: res.user.Rol, allowedBlocks, allowedTypes, isAdmin: allowedBlocks.includes('*') && allowedTypes.includes('*'), isViewer: allowedBlocks.length===0 && allowedTypes.length===0 };
+        localStorage.setItem('insaatUser', JSON.stringify(currentUser)); document.getElementById('scriptUrl').value = SCRIPT_URL; showApp(); connectSheets();
+    } catch(e) { errEl.textContent = '❌ Bağlantı hatası: ' + e.message; }
+}
+
+async function doLogout() {
+    if (!confirm('Çıkış yapmak istiyor musunuz?')) return; if (SESSION_TOKEN) { try { await gasGET({ action: 'logout', token: SESSION_TOKEN }); } catch(e) {} }
+    localStorage.removeItem('insaatUser'); localStorage.removeItem('sessionToken'); currentUser = null; SESSION_TOKEN = ''; sheetsConnected = false; document.getElementById('saveBtn').disabled = true; document.getElementById('userBadge').style.display = 'none'; showLoginScreen();
+}
+
+function parseList(val) { if (!val) return []; return String(val).split(/[,،]+/).map(s => s.trim()).filter(Boolean); }
+function listIncludes(list, value) { if (!list || !value) return false; const v = String(value).trim().toLocaleUpperCase('tr-TR'); return list.some(item => String(item).trim().toLocaleUpperCase('tr-TR') === v || item.trim() === '*'); }
+function canEditBlock(blockName) { return currentUser?.isAdmin ? true : currentUser?.isViewer ? false : listIncludes(currentUser?.allowedBlocks, blockName); }
+function canEditType(typeName) { return currentUser?.isAdmin ? true : currentUser?.isViewer ? false : listIncludes(currentUser?.allowedTypes, typeName); }
+function canDragBlock(blockName) { return canEditBlock(blockName); }
+
+function applyPermissions() {
+    const isAdmin  = currentUser?.isAdmin; 
+    const isViewer = currentUser?.isViewer;
+
+    ['addBlockSection', 'addTypeSection', 'addPlanSection'].forEach(id => { 
+        const el = document.getElementById(id); 
+        if (el) el.style.display = isAdmin ? '' : 'none'; 
+    });
+    
+    const dragEl = document.getElementById('dragSection'); 
+    if (dragEl) dragEl.style.display = isAdmin ? '' : 'none'; 
+    
+    const rotEl = document.getElementById('rotateSection');
+    if (rotEl) rotEl.style.display = isAdmin ? 'block' : 'none';
+
+    const planTitle = document.getElementById('planSectionTitle');
+    const planListEl = document.getElementById('planList');
+    if (planTitle) planTitle.style.display = isAdmin ? '' : 'none';
+    if (planListEl) planListEl.style.display = isAdmin ? '' : 'none';
+
+    const bopEl = document.getElementById('blockOpSection'); 
+    if (bopEl) bopEl.style.display = isViewer ? 'none' : '';
+    
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) {
+        if (!isAdmin) {
+            saveBtn.style.display = 'none';
+        } else {
+            saveBtn.style.display = 'block';
+        }
+    }
+
+    document.getElementById('manageUsersBtn').style.display = isAdmin ? 'block' : 'none'; 
+    document.getElementById('adminReportsBtn').style.display = isAdmin ? 'flex' : 'none';
+    
+    renderBlockList(); renderTypeList(); renderPlanList();
+}
+
+function setStatus(msg, cls) { const el = document.getElementById('syncStatus'); el.textContent = msg; el.className = ''; if (cls) el.classList.add(cls); }
+
+async function gasGET(params) {
+    const url = new URL(SCRIPT_URL); if (SESSION_TOKEN && !params.token) params.token = SESSION_TOKEN; Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+    const res  = await fetch(url.toString(), { redirect: 'follow' }); const json = JSON.parse(await res.text());
+    if (json.error === 'AUTH_REQUIRED') { forceLogout(); throw new Error('Oturum süresi doldu'); } return json;
+}
+async function gasPOST(body) {
+    if (SESSION_TOKEN && !body.token) body.token = SESSION_TOKEN;
+    await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) });
+}
+
+function forceLogout() {
+    localStorage.removeItem('insaatUser'); localStorage.removeItem('sessionToken'); currentUser = null; SESSION_TOKEN = ''; sheetsConnected = false;
+    document.getElementById('saveBtn').disabled = true; document.getElementById('userBadge').style.display = 'none'; showLoginScreen(); document.getElementById('loginError').textContent = '⚠️ Oturumunuz sona erdi, tekrar giriş yapın.';
+}
+
+async function connectSheets() {
+    const url = document.getElementById('scriptUrl').value.trim(); if (!url) { setStatus('❌ URL boş olamaz', 'status-err'); return; }
+    SCRIPT_URL = url; localStorage.setItem('scriptUrl', url); setStatus('⏳ Bağlanıyor...', 'status-load');
+    try {
+        const json = await gasGET({ action: 'load' }); if (!json.ok) throw new Error(json.error || 'Bilinmeyen hata');
+        loadFromSheets(json); sheetsConnected = true; document.getElementById('saveBtn').disabled = false; setStatus('✅ Bağlı — ' + new Date().toLocaleTimeString('tr-TR'), 'status-ok');
+    } catch(e) { setStatus('❌ Bağlantı hatası: ' + e.message, 'status-err'); }
+}
+
+function loadFromSheets(json) {
+    if (json.types && json.types.length) { constructionTypes = json.types.map(t => ({ name: t.TurAdi, colorCSS: t.RenkCSS, colorHex: parseInt((t.RenkHex || t.RenkCSS || '#475569').replace('#',''), 16) })); renderTypeList(); renderTypeSelect(); }
+    
+    if (json.plans && json.plans.length) {
+        floorPlans = json.plans.map(p => ({ name: p.PlanAdi, floorNames: p.KatIsimleri ? String(p.KatIsimleri).split(',').map(s=>s.trim()) : [] }));
+    } else if (floorPlans.length === 0) {
+        floorPlans = [{ name: 'Standart 6 Kat', floorNames: ['1. Kat','2. Kat','3. Kat','4. Kat','5. Kat','6. Kat'] }];
+    }
+    renderPlanList(); renderPlanSelects();
+
+    if (json.blocks && json.blocks.length) {
+        blockDefs.forEach(d => { if (buildings[d.name]) scene.remove(buildings[d.name].pivot); }); Object.keys(buildings).forEach(k => delete buildings[k]); blockDefs = [];
+        json.blocks.forEach(b => { 
+            const def = { name: b.BlokAdi, floors: parseInt(b.KatSayisi)||6, x: parseFloat(b.PozisyonX)||0, z: parseFloat(b.PozisyonZ)||0, planName: b.PlanAdi || '', floorNames: b.KatIsimleri ? String(b.KatIsimleri).split(',').map(s=>s.trim()) : [], rY: parseFloat(b.DonmeAcisi)||0 }; 
+            blockDefs.push(def); createBlockMeshes(def); 
+        });
+    }
+    if (json.states && json.states.length) {
+        json.states.forEach(s => {
+            const b = buildings[s.BlokAdi]; if (!b) return; const floorIdx = parseInt(s.KatNo) - 1; if (floorIdx < 0 || floorIdx >= b.floors.length) return;
+            const mesh = b.floors[floorIdx]; ensureFloorHasAllTypes(mesh); mesh.userData.states[s.ImalatTuru] = parseInt(s.Durum) || 0;
+        });
+    }
+    selectedBlockName = blockDefs[0]?.name || null; renderBlockList(); refreshSceneColors();
+}
+
+async function saveToSheets() {
+    if (!sheetsConnected) { setStatus('❌ Önce bağlanın', 'status-err'); return; } setStatus('⏳ Kaydediliyor...', 'status-load');
+    try { await gasPOST({ action: 'saveAll', data: buildSavePayload() }); setStatus('✅ Kaydedildi — ' + new Date().toLocaleTimeString('tr-TR'), 'status-ok'); } catch(e) { setStatus('❌ Kayıt hatası: ' + e.message, 'status-err'); }
+}
+
+const saveTimers = {};
+function autoSaveState(floor, type) {
+    if (!sheetsConnected) return; const key = floor.userData.block + "_" + floor.userData.floor + "_" + type; clearTimeout(saveTimers[key]);
+    saveTimers[key] = setTimeout(async () => {
+        try {
+            const state = floor.userData.states[type] || 0;
+            await gasPOST({ action: 'saveState', data: { block: floor.userData.block, floor: floor.userData.floor, floorName: floor.userData.floorName, type, state } });
+            setStatus('✅ Otomatik kaydedildi — ' + new Date().toLocaleTimeString('tr-TR'), 'status-ok');
+        } catch(e) {}
+    }, 1000);
+}
+
+async function deleteBlockFromSheets(name) { if (!sheetsConnected) return; try { await gasPOST({ action: 'deleteBlock', blockName: name }); } catch(e) {} }
+
+function buildSavePayload() {
+    const blocks = blockDefs.map(d => ({ name: d.name, floors: d.floors, x: buildings[d.name]?.pivot.position.x ?? d.x, z: buildings[d.name]?.pivot.position.z ?? (d.z ?? 0), planName: d.planName || '', floorNames: d.floorNames || [], rY: d.rY || 0 }));
+    const states = [];
+    Object.values(buildings).forEach(b => { b.floors.forEach(f => { constructionTypes.forEach(t => { states.push({ block: f.userData.block, floor: f.userData.floor, type: t.name, state: f.userData.states[t.name] || 0 }); }); }); });
+    const types = constructionTypes.map(t => ({ name: t.name, colorCSS: t.colorCSS, colorHex: '#' + t.colorHex.toString(16).padStart(6, '0') }));
+    const plans = floorPlans.map(p => ({ name: p.name, floorNames: p.floorNames }));
+    return { blocks, states, types, plans };
+}
+
+// ============================
+// LOG & EXCEL
+// ============================
+async function openLogModal() {
+    document.getElementById('logModal').classList.remove('hidden'); const logList = document.getElementById('logList'); logList.innerHTML = '<div style="color:white;text-align:center;">Loglar çekiliyor...</div>';
+    try {
+        const res = await gasGET({ action: 'getLogs' });
+        if (res.ok) {
+            logList.innerHTML = ''; if (!res.logs || res.logs.length === 0) { logList.innerHTML = '<div style="color:#94a3b8;">Henüz işlem geçmişi bulunmuyor.</div>'; return; }
+            res.logs.forEach(log => {
+                const dateObj = new Date(log.Tarih); const dateStr = isNaN(dateObj) ? log.Tarih : dateObj.toLocaleString('tr-TR');
+                let katGosterimi = isNaN(log.KatNo) ? log.KatNo : log.KatNo + ". Kat";
+                const div = document.createElement('div'); div.className = 'log-item';
+                div.innerHTML = `<div class="log-header"><span>🕒 ${dateStr}</span><span class="log-user">👤 ${log.Kullanici}</span></div><div class="log-body"><b>${log.BlokAdi}</b> - ${katGosterimi} <br>${log.ImalatTuru}: <span style="color:#10b981;font-weight:bold;">${log.Durum}</span></div>`;
+                logList.appendChild(div);
+            });
+        } else { logList.innerHTML = '<div style="color:#ef4444;">Hata: ' + res.error + '</div>'; }
+    } catch(e) { logList.innerHTML = '<div style="color:#ef4444;">Bağlantı hatası!</div>'; }
+}
+function closeLogModal() { document.getElementById('logModal').classList.add('hidden'); }
+
+function exportToExcel() {
+    if (typeof XLSX === 'undefined') { alert("Excel kütüphanesi yükleniyor, bekleyin."); return; }
+    const summaryData = [["Blok Adı", "Kat Sayısı", "Tamamlanan İş", "Toplam İş Kalemi", "İlerleme Oranı (%)"]];
+    Object.values(buildings).forEach(b => {
+        let blockTotal = 0; let blockCompleted = 0;
+        b.floors.forEach(f => { constructionTypes.forEach(t => { blockTotal++; if (f.userData.states[t.name] === 2) blockCompleted++; }); });
+        summaryData.push([b.def.name, b.def.floors, blockCompleted, blockTotal, blockTotal === 0 ? 0 : Math.round((blockCompleted / blockTotal) * 100)]);
+    });
+    const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
+    
+    const detailData = [["Blok", "Kat", "İmalat Türü", "Durum"]]; const durumStr = ["BAŞLAMADI", "DEVAM EDİYOR", "TAMAMLANDI"];
+    Object.values(buildings).forEach(b => {
+        b.floors.forEach(f => { constructionTypes.forEach(t => { const st = f.userData.states[t.name] || 0; detailData.push([b.def.name, f.userData.floorName, t.name, durumStr[st]]); }); });
+    });
+    const ws2 = XLSX.utils.aoa_to_sheet(detailData);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws1, "Proje Özeti"); XLSX.utils.book_append_sheet(wb, ws2, "Kat İlerleme Detayı");
+    XLSX.writeFile(wb, "Santiye_Durum_Raporu_" + new Date().toLocaleDateString('tr-TR').replace(/\./g, '-') + ".xlsx");
+}
+
+// ============================
+// KULLANICI YÖNETİMİ JS
+// ============================
+let loadedUsers = [];
+async function openUserManager() {
+    document.getElementById('userModal').classList.remove('hidden'); document.getElementById('userModalList').innerHTML = '<div style="color:white;text-align:center;">Veriler çekiliyor...</div>'; document.getElementById('userModalEdit').classList.add('hidden'); document.getElementById('userModalAdd').classList.add('hidden'); document.getElementById('userModalList').classList.remove('hidden'); document.getElementById('btnAddNewUser').style.display = 'block';
+    try { const res = await gasGET({ action: 'getUsers' }); if (res.ok) { loadedUsers = res.users; renderUserModalList(); } else { document.getElementById('userModalList').innerHTML = '<div style="color:#ef4444;">Hata: ' + res.error + '</div>'; } } catch(e) { document.getElementById('userModalList').innerHTML = '<div style="color:#ef4444;">Bağlantı hatası!</div>'; }
+}
+function closeUserManager() { document.getElementById('userModal').classList.add('hidden'); }
+function renderUserModalList() {
+    const list = document.getElementById('userModalList'); list.innerHTML = ''; if(loadedUsers.length === 0) { list.innerHTML = '<div style="color:#94a3b8;">Kullanıcı bulunamadı.</div>'; return; }
+    loadedUsers.forEach(u => { const div = document.createElement('div'); div.className = 'user-list-item'; div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><b style="color:#38bdf8;">${u.KullaniciAdi}</b><span style="font-size:0.75em; background:#475569; padding:2px 6px; border-radius:4px;">${u.Rol}</span></div><div style="margin-top:6px; font-size:0.8em; color:#94a3b8;"><b>Bloklar:</b> ${u.YetkiliBloklar || 'Görev Yok'} <br><b>İmalatlar:</b> ${u.YetkiliImalatlar || 'Görev Yok'}</div>`; div.onclick = () => openUserEdit(u); list.appendChild(div); });
+}
+function openAddUser() { document.getElementById('addUserName').value = ''; document.getElementById('addUserPass').value = ''; document.getElementById('addUserRole').value = 'user'; document.getElementById('btnAddNewUser').style.display = 'none'; document.getElementById('userModalList').classList.add('hidden'); document.getElementById('userModalEdit').classList.add('hidden'); document.getElementById('userModalAdd').classList.remove('hidden'); }
+function cancelAddUser() { document.getElementById('userModalAdd').classList.add('hidden'); document.getElementById('userModalList').classList.remove('hidden'); document.getElementById('btnAddNewUser').style.display = 'block'; }
+async function submitNewUser() {
+    const uName = document.getElementById('addUserName').value.trim(); const uPass = document.getElementById('addUserPass').value.trim(); const uRole = document.getElementById('addUserRole').value; if (!uName || !uPass) { alert('Zorunlu!'); return; }
+    const btn = document.querySelector('#userModalAdd .btn-green'); btn.textContent = '⏳ Ekleniyor...'; btn.disabled = true;
+    try { await gasPOST({ action: 'addUser', data: { KullaniciAdi: uName, Sifre: uPass, Rol: uRole, YetkiliBloklar: "", YetkiliImalatlar: "" } }); alert(uName + ' eklendi!'); cancelAddUser(); openUserManager(); } catch(e) { alert('Hata oluştu!'); } finally { btn.textContent = '💾 Sistemi Kaydet'; btn.disabled = false; }
+}
+function createChip(label, value, isSelected, isStar) {
+    const div = document.createElement('div'); div.className = 'chip' + (isSelected ? ' selected' : '') + (isStar ? ' all-star' : ''); div.textContent = label; div.dataset.val = value;
+    div.onclick = () => { const container = div.parentElement; if (isStar) { const willSelect = !div.classList.contains('selected'); Array.from(container.children).forEach(c => { if (willSelect) c.classList.add('selected'); else c.classList.remove('selected'); }); } else { div.classList.toggle('selected'); if (!div.classList.contains('selected')) container.querySelector('.all-star').classList.remove('selected'); else { const allNormal = Array.from(container.querySelectorAll('.chip:not(.all-star)')); if (allNormal.every(c => c.classList.contains('selected'))) container.querySelector('.all-star').classList.add('selected'); } } }; return div;
+}
+let userEditingObj = null; 
+function openUserEdit(u) {
+    userEditingObj = u; document.getElementById('editUserLoginName').value = u.KullaniciAdi; document.getElementById('editRole').value = u.Rol || 'user'; document.getElementById('editUserPass').value = ''; 
+    const userBlocks = parseList(u.YetkiliBloklar); const userTypes = parseList(u.YetkiliImalatlar);
+    const bc = document.getElementById('editBlocksContainer'); bc.innerHTML = ''; const hasAllBlocks = listIncludes(userBlocks, '*'); bc.appendChild(createChip('Tüm Bloklar (*)', '*', hasAllBlocks, true)); blockDefs.forEach(d => { const isSel = hasAllBlocks || listIncludes(userBlocks, d.name); bc.appendChild(createChip(d.name, d.name, isSel, false)); });
+    const tc = document.getElementById('editTypesContainer'); tc.innerHTML = ''; const hasAllTypes = listIncludes(userTypes, '*'); tc.appendChild(createChip('Tüm İmalatlar (*)', '*', hasAllTypes, true)); constructionTypes.forEach(t => { const isSel = hasAllTypes || listIncludes(userTypes, t.name); tc.appendChild(createChip(t.name, t.name, isSel, false)); });
+    document.getElementById('btnAddNewUser').style.display = 'none'; document.getElementById('userModalList').classList.add('hidden'); document.getElementById('userModalAdd').classList.add('hidden'); document.getElementById('userModalEdit').classList.remove('hidden');
+}
+function cancelUserEdit() { userEditingObj = null; document.getElementById('userModalEdit').classList.add('hidden'); document.getElementById('userModalList').classList.remove('hidden'); document.getElementById('btnAddNewUser').style.display = 'block'; }
+function getSelectedChips(containerId) { const container = document.getElementById(containerId); const star = container.querySelector('.all-star'); if (star && star.classList.contains('selected')) return '*'; return Array.from(container.querySelectorAll('.chip.selected:not(.all-star)')).map(c => c.dataset.val).join(', '); }
+async function deleteSelectedUser() {
+    if (!userEditingObj) return; if (userEditingObj.KullaniciAdi === currentUser.username) { alert("Kendinizi silemezsiniz!"); return; }
+    if (!confirm('Emin misiniz?')) return; const btn = document.querySelector('#userModalEdit .btn-red'); btn.textContent = '⏳ Siliniyor...'; btn.disabled = true;
+    try { await gasPOST({ action: 'deleteUser', username: userEditingObj.KullaniciAdi }); alert('Silindi!'); cancelUserEdit(); openUserManager(); } catch(e) { alert('Hata oluştu!'); } finally { btn.textContent = '🗑️ Sil'; btn.disabled = false; }
+}
+async function saveUserTasks() {
+    if (!userEditingObj) return; const newKullaniciAdi = document.getElementById('editUserLoginName').value.trim(); if (!newKullaniciAdi) { alert("Boş olamaz!"); return; }
+    const btn = document.querySelector('#userModalEdit .btn-green'); btn.textContent = '⏳ Kaydediliyor...'; btn.disabled = true; const newPass = document.getElementById('editUserPass').value.trim();
+    const updatedData = { EskiKullaniciAdi: userEditingObj.KullaniciAdi, KullaniciAdi: newKullaniciAdi, Sifre: newPass !== '' ? newPass : undefined, YetkiliBloklar: getSelectedChips('editBlocksContainer'), YetkiliImalatlar: getSelectedChips('editTypesContainer'), Rol: document.getElementById('editRole').value };
+    try { await fetch(SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'updateUser', data: updatedData, token: SESSION_TOKEN }) }); await new Promise(r => setTimeout(r, 1500)); alert('Kaydedildi!'); cancelUserEdit(); openUserManager(); } catch(e) { alert('Hata!'); } finally { btn.textContent = '💾 Kaydet'; btn.disabled = false; }
+}
+
+// ============================
+// RENDER LOOP
+// ============================
+function animate() { requestAnimationFrame(animate); orbitControls.update(); renderer.render(scene, camera); }
+function onResize() { const sidebarW = window.innerWidth >= 768 ? 330 : 0; const sidebarH = window.innerWidth < 768 ? document.getElementById('sidebar').offsetHeight : 0; const w = window.innerWidth - sidebarW; const h = window.innerHeight - sidebarH; camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h); }
+window.addEventListener('resize', onResize); onResize(); renderBlockList(); renderTypeList(); renderPlanList(); renderPlanSelects(); renderColorSwatches(); animate();
+</script>
+</body>
+</html>
