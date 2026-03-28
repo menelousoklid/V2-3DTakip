@@ -64,6 +64,26 @@
         .add-form .row input { flex: 1; }
         
         #modeIndicator { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); background: rgba(14,165,233,0.2); border: 1px solid #38bdf8; color: #38bdf8; padding: 6px 14px; border-radius: 20px; font-size: 0.75em; pointer-events: none; display: none; }
+
+        #liveNotif {
+            display: none;
+            position: absolute;
+            top: 14px; right: 14px;
+            background: rgba(15,23,42,0.97);
+            border: 1px solid #10b981;
+            border-radius: 12px;
+            padding: 12px 16px;
+            min-width: 230px;
+            max-width: 300px;
+            z-index: 600;
+            box-shadow: 0 4px 24px rgba(16,185,129,0.18);
+            font-size: 0.82em;
+            color: #f1f5f9;
+        }
+        @keyframes notifSlideIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
         
         
         .color-row { display: flex; gap: 5px; margin-bottom: 6px; flex-wrap: wrap; }
@@ -223,6 +243,7 @@
 
 <div id="viewport">
     <div id="modeIndicator">✋ Taşıma Modu Aktif</div>
+    <div id="liveNotif"></div>
 
     <!-- BLOK POPUP KARTI -->
     <div id="blockPopup" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
@@ -940,6 +961,7 @@ async function doLogin() {
 
 async function doLogout() {
     if (!confirm('Çıkış yapmak istiyor musunuz?')) return; if (SESSION_TOKEN) { try { await gasGET({ action: 'logout', token: SESSION_TOKEN }); } catch(e) {} }
+    stopLivePolling();
     localStorage.removeItem('insaatUser'); localStorage.removeItem('sessionToken'); currentUser = null; SESSION_TOKEN = ''; sheetsConnected = false; document.getElementById('saveBtn').disabled = true; document.getElementById('userBadge').style.display = 'none'; showLoginScreen();
 }
 
@@ -1009,8 +1031,103 @@ async function connectSheets() {
     SCRIPT_URL = url; localStorage.setItem('scriptUrl', url); setStatus('⏳ Bağlanıyor...', 'status-load');
     try {
         const json = await gasGET({ action: 'load' }); if (!json.ok) throw new Error(json.error || 'Bilinmeyen hata');
-        loadFromSheets(json); sheetsConnected = true; document.getElementById('saveBtn').disabled = false; setStatus('✅ Bağlı — ' + new Date().toLocaleTimeString('tr-TR'), 'status-ok');
+        loadFromSheets(json); sheetsConnected = true; document.getElementById('saveBtn').disabled = false; 
+        setStatus('✅ Bağlı — ' + new Date().toLocaleTimeString('tr-TR'), 'status-ok');
+        startLivePolling(); // Bağlantı kurulunca polling başlat
     } catch(e) { setStatus('❌ Bağlantı hatası: ' + e.message, 'status-err'); }
+}
+
+// ============================
+// CANLI DEĞİŞİKLİK TAKİBİ (45sn polling)
+// ============================
+let pollingTimer = null;
+let lastPollTime = new Date().toISOString();
+let pendingChanges = []; // Bildirim bekleyen değişiklikler
+
+function startLivePolling() {
+    stopLivePolling();
+    lastPollTime = new Date().toISOString();
+    pollingTimer = setInterval(pollForChanges, 45000);
+}
+
+function stopLivePolling() {
+    if (pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
+}
+
+async function pollForChanges() {
+    if (!sheetsConnected || !SCRIPT_URL) return;
+    try {
+        const pollSince = lastPollTime;
+        const res = await gasGET({ action: 'getRecentChanges', since: pollSince });
+        lastPollTime = res.serverTime || new Date().toISOString();
+        if (!res.ok || res.count === 0) return;
+
+        // Admin değilse (mühendis) — sahne durumunu sessizce güncelle
+        if (!currentUser?.isAdmin) {
+            applyRemoteChanges(res.changes);
+            return;
+        }
+
+        // Admin ise — bildirim göster, sahneyi güncelle
+        applyRemoteChanges(res.changes);
+        showLiveNotification(res.changes);
+    } catch(e) { /* Polling hatası sessizce geç */ }
+}
+
+function applyRemoteChanges(changes) {
+    // Gelen state değişikliklerini 3D sahneye uygula (eziyor değil, güncel olan kazanır)
+    changes.forEach(c => {
+        const b = buildings[c.blok]; if (!b) return;
+        const floorIdx = b.floors.findIndex(f => f.userData.floorName === c.kat || String(f.userData.floor) === String(c.kat));
+        if (floorIdx === -1) return;
+        const mesh = b.floors[floorIdx];
+        ensureFloorHasAllTypes(mesh);
+        // durum: "BAŞLAMADI"→0, "DEVAM EDİYOR"→1, "TAMAMLANDI"→2
+        const stateMap = { 'BAŞLAMADI': 0, 'DEVAM EDİYOR': 1, 'TAMAMLANDI': 2 };
+        const numVal = stateMap[c.durum];
+        if (numVal !== undefined) mesh.userData.states[c.imalat] = numVal;
+    });
+    refreshSceneColors();
+    // Popup açıksa onu da güncelle
+    if (popupBlockTarget) {
+        const changed = changes.some(c => c.blok === popupBlockTarget);
+        if (changed) openBlockPopup(popupBlockTarget, null, document.getElementById('typeSel').value);
+    }
+}
+
+function showLiveNotification(changes) {
+    // Değişiklikleri grupla: blok bazında
+    const byBlock = {};
+    changes.forEach(c => {
+        if (!byBlock[c.blok]) byBlock[c.blok] = { kullanici: c.kullanici, count: 0 };
+        byBlock[c.blok].count++;
+    });
+
+    const el = document.getElementById('liveNotif');
+    const totalBlocks = Object.keys(byBlock).length;
+    const totalChanges = changes.length;
+    const users = [...new Set(changes.map(c => c.kullanici))].join(', ');
+    const lastTime = changes[changes.length - 1]?.tarih || '';
+
+    el.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+            <div>
+                <div style="font-weight:bold; color:#10b981; margin-bottom:3px;">🔔 Saha Güncellemesi</div>
+                <div style="font-size:0.8em; color:#cbd5e1;"><b>${totalChanges}</b> yeni giriş — <b>${totalBlocks}</b> blok</div>
+                <div style="font-size:0.75em; color:#64748b; margin-top:2px;">👷 ${users}</div>
+                ${lastTime ? `<div style="font-size:0.68em; color:#475569; margin-top:2px;">${lastTime}</div>` : ''}
+            </div>
+            <span onclick="closeLiveNotif()" style="cursor:pointer; color:#475569; font-size:1.1em; flex-shrink:0;" onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#475569'">✕</span>
+        </div>`;
+    el.style.display = 'block';
+    el.style.animation = 'none'; el.offsetHeight; el.style.animation = 'notifSlideIn 0.3s ease';
+
+    clearTimeout(showLiveNotification._timer);
+    showLiveNotification._timer = setTimeout(closeLiveNotif, 12000);
+}
+
+function closeLiveNotif() {
+    document.getElementById('liveNotif').style.display = 'none';
 }
 
 function loadFromSheets(json) {
