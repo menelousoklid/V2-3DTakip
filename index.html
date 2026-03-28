@@ -316,6 +316,15 @@
             <label>İmalat Adı</label><input type="text" id="editTypeNameInput" style="margin-bottom:10px;">
             <label>Renk</label><div class="color-row" id="editTypeColorSwatches" style="margin-bottom:15px;"></div>
         </div>
+
+        <div id="editPlanFields" class="hidden">
+            <label>Plan Adı</label>
+            <input type="text" id="editPlanNameInput" style="margin-bottom:10px;">
+            <label>Kat İsimleri <span style="color:#64748b;font-size:0.85em;">(aşağıdan yukarı, virgülle)</span></label>
+            <textarea id="editPlanFloorsInput" style="margin-bottom:6px; min-height:80px;"></textarea>
+            <div id="editPlanFloorCount" style="font-size:0.72em; color:#64748b; margin-bottom:10px;"></div>
+        </div>
+
         <div class="btn-row">
             <button class="btn btn-green" onclick="saveEditModal()">💾 Kaydet</button>
             <button class="btn btn-gray" onclick="closeEditModal()">İptal</button>
@@ -660,6 +669,7 @@ function openEditBlock(name) {
     
     document.getElementById('editBlockFields').classList.remove('hidden');
     document.getElementById('editTypeFields').classList.add('hidden');
+    document.getElementById('editPlanFields').classList.add('hidden');
     document.getElementById('editModal').classList.remove('hidden');
 }
 
@@ -670,7 +680,33 @@ function openEditType(name) {
     document.getElementById('editTypeNameInput').value = tObj.name;
     editSelectedColorIdx = PALETTE_COLORS.indexOf(tObj.colorCSS); if(editSelectedColorIdx === -1) editSelectedColorIdx = 0;
     renderEditColorSwatches();
-    document.getElementById('editTypeFields').classList.remove('hidden'); document.getElementById('editBlockFields').classList.add('hidden'); document.getElementById('editModal').classList.remove('hidden');
+    document.getElementById('editTypeFields').classList.remove('hidden'); 
+    document.getElementById('editBlockFields').classList.add('hidden'); 
+    document.getElementById('editPlanFields').classList.add('hidden');
+    document.getElementById('editModal').classList.remove('hidden');
+}
+
+function openEditPlan(name) {
+    if (!currentUser?.isAdmin) return;
+    const plan = floorPlans.find(p => p.name === name); if (!plan) return;
+    editingEntity = { type: 'plan', oldName: name };
+    document.getElementById('editModalTitle').textContent = 'Kat Planı Düzenle';
+    document.getElementById('editPlanNameInput').value = plan.name;
+    const floorsText = plan.floorNames.join(', ');
+    const ta = document.getElementById('editPlanFloorsInput');
+    ta.value = floorsText;
+    updateEditPlanFloorCount();
+    ta.oninput = updateEditPlanFloorCount;
+    document.getElementById('editPlanFields').classList.remove('hidden');
+    document.getElementById('editBlockFields').classList.add('hidden');
+    document.getElementById('editTypeFields').classList.add('hidden');
+    document.getElementById('editModal').classList.remove('hidden');
+}
+
+function updateEditPlanFloorCount() {
+    const val = document.getElementById('editPlanFloorsInput').value;
+    const count = val.split(',').map(s => s.trim()).filter(Boolean).length;
+    document.getElementById('editPlanFloorCount').textContent = count + ' kat girişi algılandı';
 }
 
 function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); editingEntity = null; }
@@ -709,6 +745,39 @@ function saveEditModal() {
         tObj.name = newName; tObj.colorHex = PALETTE_HEX[editSelectedColorIdx]; tObj.colorCSS = PALETTE_COLORS[editSelectedColorIdx];
         Object.values(buildings).forEach(b => { b.floors.forEach(f => { if (oldName in f.userData.states) { f.userData.states[newName] = f.userData.states[oldName]; if (newName !== oldName) delete f.userData.states[oldName]; } }); });
         renderTypeList(); renderTypeSelect(); refreshSceneColors();
+    } else if (editingEntity.type === 'plan') {
+        const newName = document.getElementById('editPlanNameInput').value.trim();
+        const floorsStr = document.getElementById('editPlanFloorsInput').value;
+        const newFloorNames = floorsStr.split(',').map(s => s.trim()).filter(Boolean);
+
+        if (!newName) { alert('Plan adı boş olamaz!'); return; }
+        if (newFloorNames.length === 0) { alert('En az 1 kat adı girmelisiniz!'); return; }
+        const oldName = editingEntity.oldName;
+        if (newName !== oldName && floorPlans.find(p => p.name === newName)) { alert('Bu isimde bir plan zaten var!'); return; }
+
+        const plan = floorPlans.find(p => p.name === oldName);
+        plan.name = newName;
+        plan.floorNames = newFloorNames;
+
+        // Bu planı kullanan blokları da güncelle
+        blockDefs.forEach(def => {
+            if (def.planName === oldName) {
+                def.planName = newName;
+                def.floors = newFloorNames.length;
+                def.floorNames = [...newFloorNames];
+                // Sahneyi yeniden oluştur — eski states korunsun
+                const oldStates = {};
+                if (buildings[def.name]) {
+                    buildings[def.name].floors.forEach((f, i) => { oldStates[i] = JSON.parse(JSON.stringify(f.userData.states)); });
+                    scene.remove(buildings[def.name].pivot); delete buildings[def.name];
+                }
+                createBlockMeshes(def);
+                buildings[def.name].floors.forEach((f, i) => { if (oldStates[i]) f.userData.states = oldStates[i]; });
+            }
+        });
+
+        renderPlanList(); renderPlanSelects(); renderBlockList(); refreshSceneColors();
+        if (sheetsConnected) setStatus('⚠️ Plan güncellendi — Kaydet butonuna basmayı unutmayın!', 'status-load');
     }
     closeEditModal();
 }
@@ -740,7 +809,12 @@ function renderPlanList() {
     const list = document.getElementById('planList'); list.innerHTML = '';
     floorPlans.forEach(p => {
         const li = document.createElement('li'); 
-        let adminBtns = currentUser?.isAdmin ? `<div class="action-btns"><span class="remove-btn" onclick="removePlan('${p.name}')">✕</span></div>` : '';
+        let adminBtns = currentUser?.isAdmin 
+            ? `<div class="action-btns">
+                <span class="edit-btn" onclick="openEditPlan('${p.name}')">✏️</span>
+                <span class="remove-btn" onclick="removePlan('${p.name}')">✕</span>
+               </div>` 
+            : '';
         li.innerHTML = `<span class="type-name"><b>${p.name}</b> <span style="color:#64748b;font-size:0.8em">(${p.floorNames.length} Kat)</span></span>${adminBtns}`; 
         list.appendChild(li);
     });
